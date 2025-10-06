@@ -1,29 +1,36 @@
-# Workshop name
+# RNA-seq Workshop Day 3: Statistical Foundations of RNA-seq
 
 ## Overview
-<Add a brief description and objectives of the workshop here>
+This session will introduce participants to the statistical foundations required for analyzing RNA-seq count data. We will focus on generalized linear models (GLMs) and the principles of statistical testing that underpin differential gene expression analysis. Participants will learn how to pre-process and filter a count matrix, fit appropriate models, and interpret key statistical outputs that set the stage for downstream analyses.
    
 ## Requirements
-<Add computational/knowledge requirements here>
+1. Experience with R (RStudio Installed)
+2. Understand how an RNA-seq count matrix is generated
 
-<If a unix terminal is needed, include instructions to download it on windows>
-We will be using the unix terminal to run our analyses. so be sure you have access to one. 
-* Mac OS and any linux distribution will have a terminal already
-    * Mac OS: search for terminal in your spotlight search
-* Windows users: 
-    * Option 1: Download a [unix subsystem (WSL)](https://ubuntu.com/tutorials/install-ubuntu-on-wsl2-on-windows-10#1-overview) **recommended
-    * Option 2: Download [MobaXterm](https://mobaxterm.mobatek.net/)
+## Software
+* RStudio: https://posit.co/download/rstudio-desktop/
+
+## R libraries
+* edgeR
+* ggplot2
+* dplyr
+* MASS
    
-## Sofware <List of software that will be used during the workshop>
-* [Software1](link to installation instructions)
-* [Software2](link to installation instructions)
-* Instructions to open colab, Rlibraries, etc.
-   
-## Small Outline/Structure (with link to exercises in colab if applicable)
-* topic
-   - exercise - link to colab
+## Small Outline/Structure
+* Task of differential gene expression: pairwise vs multigroup comparisons
+* Preprocess for fair comparison: Filtering / Normalization
+* Statistical testing: Exact test for pairwise
+* Linear regression
+* Poisson and negative binomial distributions
+* Generalized linear model
+* Sample analysis using edgeR (R notebook)
 
 ## References
-*<Material Author/Adapted from disclaimer>*
-   
+* Materials created by Ryan Huang, with figures from the following sources:
+* Past MiCM slides: Intro to RNA-seq and Statistics in R (Adrien Osakwe)
+* QLSC600 slides: myself and Megan Ng
+* RNA-seq lecture by Peter N. Robinson
+* Tutorial from Berge and Clement: https://statomics.github.io/SGA/sequencing_countData.html
+
+
 *Workshop created as part of the McGill Initiative in Computational Medicine*
