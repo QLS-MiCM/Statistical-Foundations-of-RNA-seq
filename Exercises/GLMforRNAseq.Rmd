@@ -1,0 +1,283 @@
+---
+title: "Day 3: Introduction to Statistical Modelling of Count Data in R"
+author: "Ryan Huang"
+output: html_document
+---
+
+# Workshop Overview
+
+This notebook accompanies **Day 3** of the McGill MiCM RNA-seq Workshop.  
+We will cover:
+
+- Basic statistics review
+- Why linear regression fails for RNA-seq counts  
+- Poisson vs. Negative Binomial distributions  
+- edgeR workflow for RNA-seq DE: filtering, normalization, dispersion, GLM fitting  
+- Why normalization and dispersion matter (hands-on comparisons)  
+
+---
+
+# 0. Load Required Libraries
+
+```{r}
+library(edgeR)
+library(ggplot2)
+library(dplyr)
+library(MASS)
+```
+
+---
+
+# 1. Statistics Review
+
+First, look at linear regression and its Gaussian assumption.
+
+```{r}
+set.seed(1)
+x <- 1:20
+y <- 2*x + rnorm(20, 0, 3)
+lm_fit <- lm(y ~ x)
+summary(lm_fit)
+
+plot(x, y, pch=16, main="Linear Regression Example")
+abline(lm_fit, col="red", lwd=2)
+```
+
+If the residuals are not Gaussian...
+
+```{r}
+counts_example <- rpois(20, lambda=10)
+hist(counts_example, main="Poisson-like RNA-seq counts",
+     xlab="Counts", col="skyblue")
+
+x <- 1:100
+y <- rpois(100, lambda=0.3*x + 2)
+lm_fit <- lm(y ~ x)
+summary(lm_fit)
+
+plot(x, y, pch=16, main="Linear Regression Example")
+abline(lm_fit, col="red", lwd=2)
+
+# GLM
+glm_fit <- glm(y ~ x, family = poisson(link = "identity"))
+summary(glm_fit)
+
+plot(x, y, pch=16, main="Poisson GLM fit")
+lines(x, predict(glm_fit, type="response"), col="blue", lwd=2)
+```
+
+
+Relevant distribution for count data: Poisson and negative binomial
+
+```{r}
+pois <- rpois(1000, lambda=20)
+nb   <- rnbinom(1000, mu=20, size=5)
+
+data.frame(
+  Distribution = c("Poisson","Negative Binomial"),
+  Mean = c(mean(pois), mean(nb)),
+  Variance = c(var(pois), var(nb))
+)
+
+hist(pois, main="Poisson-like RNA-seq counts",
+     xlab="Counts", col="skyblue")
+hist(nb, main="NB-like RNA-seq counts",
+     xlab="Counts", col="red")
+```
+
+Compare Gaussian (LM), Poisson (GLM), and NB (GLM)
+
+```{r}
+x <- 1:20
+
+# Generate overdispersed count data (mean increases exponentially with x)
+lambda <- exp(0.3 * x)
+# Add extra biological noise (overdispersion)
+y <- rnbinom(20, mu = lambda, size = 5)
+
+# Fit three models
+lm_fit   <- lm(y ~ x)                        # Gaussian linear model
+glm_pois <- glm(y ~ x, family = poisson)     # Poisson GLM
+glm_nb   <- MASS::glm.nb(y ~ x)              # Negative Binomial GLM
+
+# Summaries
+summary(lm_fit)
+summary(glm_pois)
+summary(glm_nb)
+
+# Predicted values
+fitted_lm   <- predict(lm_fit)
+fitted_pois <- predict(glm_pois, type = "response")
+fitted_nb   <- predict(glm_nb, type = "response")
+
+# Plot model fits
+plot(x, y, pch = 16, cex = 1.2,
+     main = "Model Comparison on Count Data (Overdispersed)",
+     xlab = "x", ylab = "Counts")
+
+lines(x, fitted_lm,   col = "red",  lwd = 2, lty = 2)
+lines(x, fitted_pois, col = "blue", lwd = 2)
+lines(x, fitted_nb,   col = "darkgreen", lwd = 2)
+
+legend("topleft",
+       legend = c("Linear Model (red dashed)",
+                  "Poisson GLM (blue)",
+                  "Negative Binomial GLM (green)"),
+       col = c("red", "blue", "darkgreen"),
+       lty = c(2, 1, 1),
+       lwd = 2, bty = "n")
+
+# Compare residuals
+par(mfrow = c(1, 3))
+
+plot(fitted_lm, resid(lm_fit),
+     main = "Linear Model Residuals",
+     xlab = "Fitted values", ylab = "Residuals")
+abline(h = 0, col = "grey")
+
+plot(fitted_pois, resid(glm_pois, type = "deviance"),
+     main = "Poisson GLM Residuals",
+     xlab = "Fitted values", ylab = "Deviance Residuals")
+abline(h = 0, col = "grey")
+
+plot(fitted_nb, resid(glm_nb, type = "deviance"),
+     main = "Neg. Binomial GLM Residuals",
+     xlab = "Fitted values", ylab = "Deviance Residuals")
+abline(h = 0, col = "grey")
+
+par(mfrow = c(1, 1))
+```
+
+---
+
+# 2. Create Count Matrix Object
+
+```{r}
+# Load counts (first column = GeneID, first row = header)
+counts <- read.delim("GSE53697_raw_counts_GRCh38.p13_NCBI.tsv", 
+                     header=TRUE, sep="\t", stringsAsFactors=FALSE)
+
+# Extract gene IDs
+gene_ids <- counts$GeneID
+counts <- counts[ , -1]   # remove GeneID column
+rownames(counts) <- gene_ids
+
+# Load annotation
+annot <- read.delim("Human.GRCh38.p13.annot.tsv", header=TRUE, sep="\t")
+head(annot)
+
+# Define groups
+group <- factor(c(rep("Control", 6), rep("AD", 6)))
+group
+```
+Check the distribution of count
+```{r}
+# Compute per-gene mean and variance
+gene_means <- rowMeans(counts)
+gene_vars  <- apply(counts, 1, var)
+
+# Create mean-variance plot (on log-log scale)
+plot(gene_means, gene_vars,
+     log = "xy",
+     pch = 16, cex = 0.5,
+     xlab = "Mean expression (log scale)",
+     ylab = "Variance (log scale)",
+     main = "RNA-seq: Mean vs Variance (GSE53697)")
+
+# Add red reference line (Poisson mean=variance)
+abline(0, 1, col = "red", lwd = 2)
+```
+
+edgeR object for analysis
+
+```{r}
+# Create DGEList Object
+dge <- DGEList(counts=counts, group=group)
+
+# Add gene annotation
+dge$genes <- annot[match(rownames(dge), annot$GeneID), ]
+dge
+```
+
+---
+
+# 3. Filter and Normalization
+
+```{r}
+keep <- filterByExpr(dge, group=group)
+dge <- dge[keep, , keep.lib.sizes=FALSE]
+dim(dge)
+
+dge <- calcNormFactors(dge, method="TMM")
+dge$samples
+```
+
+Plot the normalization factor
+
+```{r}
+barplot(dge$samples$norm.factors,
+        main="TMM Normalization Factors",
+        xlab="Sample", ylab="Factor")
+```
+
+---
+
+# 4. Generalized Linear Model
+
+```{r}
+dge_raw <- DGEList(counts=counts, group=group)
+dge_raw$genes <- annot[match(rownames(dge_raw), annot$GeneID), ]
+dge_raw <- dge_raw[keep, , keep.lib.sizes=FALSE]
+
+design <- model.matrix(~ group)
+
+# Without normalization
+dge_raw <- estimateDisp(dge_raw, design)
+fit_raw <- glmFit(dge_raw, design)
+lrt_raw <- glmLRT(fit_raw, coef=2)
+
+# With TMM normalization
+dge <- estimateDisp(dge, design)
+fit_norm <- glmFit(dge, design)
+lrt_norm <- glmLRT(fit_norm, coef=2)
+
+# Compare top results
+head(topTags(lrt_raw))
+head(topTags(lrt_norm))
+```
+
+---
+
+# 5. Dispersion
+
+```{r}
+plotBCV(dge)
+```
+
+```{r}
+# Force Poisson-like (no dispersion)
+dge_pois <- dge
+dge_pois$common.dispersion <- 1e-6
+fit_pois <- glmFit(dge_pois, design, dispersion=1e-6)
+lrt_pois <- glmLRT(fit_pois, coef=2)
+
+# Proper NB model
+fit_nb <- glmFit(dge, design)
+lrt_nb <- glmLRT(fit_nb, coef=2)
+
+# Compare gene rankings
+head(topTags(lrt_pois))
+head(topTags(lrt_nb))
+```
+
+---
+
+# 6. Visualization
+
+```{r}
+plotMD(lrt_nb, status=decideTestsDGE(lrt_nb),
+       main="MA Plot (LRT with Dispersion)", ylim=c(-5,5))
+```
+
+
+
