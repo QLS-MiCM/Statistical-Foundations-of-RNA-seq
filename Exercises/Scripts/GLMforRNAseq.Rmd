@@ -46,22 +46,26 @@ abline(lm_fit, col="red", lwd=2)
 If the residuals are not Gaussian...
 
 ```{r}
+# Generate Poisson samples and plot histogram
 counts_example <- rpois(20, lambda=10)
 hist(counts_example, main="Poisson-like RNA-seq counts",
      xlab="Counts", col="skyblue")
 
+# Try linear regression on Poisson samples
 x <- 1:100
 y <- rpois(100, lambda=0.3*x + 2)
 lm_fit <- lm(y ~ x)
 summary(lm_fit)
 
+# Plot the results
 plot(x, y, pch=16, main="Linear Regression Example")
 abline(lm_fit, col="red", lwd=2)
 
-# GLM
+# GLM on Poisson samples
 glm_fit <- glm(y ~ x, family = poisson(link = "identity"))
 summary(glm_fit)
 
+# Plot the results
 plot(x, y, pch=16, main="Poisson GLM fit")
 lines(x, predict(glm_fit, type="response"), col="blue", lwd=2)
 ```
@@ -73,12 +77,14 @@ Relevant distribution for count data: Poisson and negative binomial
 pois <- rpois(1000, lambda=20)
 nb   <- rnbinom(1000, mu=20, size=5)
 
+# Show statistics of Poisson and negative binomial distributions
 data.frame(
   Distribution = c("Poisson","Negative Binomial"),
   Mean = c(mean(pois), mean(nb)),
   Variance = c(var(pois), var(nb))
 )
 
+# Plot the histograms
 hist(pois, main="Poisson-like RNA-seq counts",
      xlab="Counts", col="skyblue")
 hist(nb, main="NB-like RNA-seq counts",
@@ -110,7 +116,7 @@ fitted_lm   <- predict(lm_fit)
 fitted_pois <- predict(glm_pois, type = "response")
 fitted_nb   <- predict(glm_nb, type = "response")
 
-# Plot model fits
+# Plot model fits using all three assumed distributions on the same figure
 plot(x, y, pch = 16, cex = 1.2,
      main = "Model Comparison on Count Data (Overdispersed)",
      xlab = "x", ylab = "Counts")
@@ -130,16 +136,19 @@ legend("topleft",
 # Compare residuals
 par(mfrow = c(1, 3))
 
+# Plot residual for Gaussian linear regression
 plot(fitted_lm, resid(lm_fit),
      main = "Linear Model Residuals",
      xlab = "Fitted values", ylab = "Residuals")
 abline(h = 0, col = "grey")
 
+# Plot residual for GLM with Poisson
 plot(fitted_pois, resid(glm_pois, type = "deviance"),
      main = "Poisson GLM Residuals",
      xlab = "Fitted values", ylab = "Deviance Residuals")
 abline(h = 0, col = "grey")
 
+# Plot residual for GLM with NB
 plot(fitted_nb, resid(glm_nb, type = "deviance"),
      main = "Neg. Binomial GLM Residuals",
      xlab = "Fitted values", ylab = "Deviance Residuals")
@@ -151,6 +160,9 @@ par(mfrow = c(1, 1))
 ---
 
 # 2. Create Count Matrix Object
+
+Here the two tsv files should be in the same directory as this .Rmd file.
+They can be downloaded from Github in the Exercises/Data folder.
 
 ```{r}
 # Load counts (first column = GeneID, first row = header)
@@ -170,7 +182,9 @@ head(annot)
 group <- factor(c(rep("Control", 6), rep("AD", 6)))
 group
 ```
+
 Check the distribution of count
+
 ```{r}
 # Compute per-gene mean and variance
 gene_means <- rowMeans(counts)
@@ -251,6 +265,7 @@ head(topTags(lrt_norm))
 # 5. Dispersion
 
 ```{r}
+# Plot biological coefficient of variation (related to dispersion)
 plotBCV(dge)
 ```
 
@@ -274,10 +289,11 @@ head(topTags(lrt_nb))
 
 # 6. Visualization
 
+MA Plot
+
 ```{r}
 plotMD(lrt_nb, status=decideTestsDGE(lrt_nb),
-       main="MA Plot (LRT with Dispersion)", ylim=c(-5,5))
+       main="MA Plot (LRT with Dispersion)", ylim=c(-20,20))
 ```
-
 
 
