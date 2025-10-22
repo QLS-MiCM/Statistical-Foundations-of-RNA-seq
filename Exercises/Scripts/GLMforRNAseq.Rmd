@@ -100,9 +100,10 @@ x <- 1:20
 lambda <- exp(0.3 * x)
 # Add extra biological noise (overdispersion)
 y <- rnbinom(20, mu = lambda, size = 5)
+y_log <- log(y+0.000001)
 
 # Fit three models
-lm_fit   <- lm(y ~ x)                        # Gaussian linear model
+lm_fit   <- lm(y_log ~ x)                        # Gaussian linear model
 glm_pois <- glm(y ~ x, family = poisson)     # Poisson GLM
 glm_nb   <- MASS::glm.nb(y ~ x)              # Negative Binomial GLM
 
@@ -112,7 +113,7 @@ summary(glm_pois)
 summary(glm_nb)
 
 # Predicted values
-fitted_lm   <- predict(lm_fit)
+fitted_lm   <- exp(predict(lm_fit))
 fitted_pois <- predict(glm_pois, type = "response")
 fitted_nb   <- predict(glm_nb, type = "response")
 
@@ -217,11 +218,42 @@ dge
 
 # 3. Filter and Normalization
 
+PCA before filter/normalization
 ```{r}
-keep <- filterByExpr(dge, group=group)
-dge <- dge[keep, , keep.lib.sizes=FALSE]
-dim(dge)
+# turn gene counts into dataframe
+pca_genes <- prcomp(t(dge$counts))
+d_pca <- as.data.frame(pca_genes$x) 
 
+# create PCA plot
+pca_plot <- ggplot(d_pca, aes(x = PC1,y = PC2, color = group)) +
+  labs(title = "Principle Component Analysis on ADvsCt RNA-seq Data") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  geom_point() +
+  scale_color_discrete(name = "Groups")
+  
+# show plot
+print(pca_plot)
+```
+
+Filtering and normalization
+
+```{r}
+before_n_genes <- nrow(dge)
+# Minimum gene expression filter --> keep genes with at least 5 read/million in at least n samples
+data_cpm <- cpm(dge)               # calculate counts per million
+keep <- rowSums(data_cpm >= 1) >= 4      # creates boolean vector
+dge <- dge[keep,]             # filter data for genes that pass threshold
+after_n_genes <- nrow(dge)
+
+# Display filtering results
+n_genes_gone <- before_n_genes - after_n_genes
+cat(n_genes_gone, "genes filtered out.\n", "Before: ", before_n_genes, "\n", "After: ", after_n_genes)
+
+# normalize for library size with CPM
+cpm_counts <- cpm(dge)
+dge$counts <- cpm_counts
+
+# further normalization with TMM
 dge <- calcNormFactors(dge, method="TMM")
 dge$samples
 ```
@@ -234,6 +266,23 @@ barplot(dge$samples$norm.factors,
         xlab="Sample", ylab="Factor")
 ```
 
+PCA after filter/normalization
+```{r}
+# turn gene counts into dataframe
+pca_genes <- prcomp(t(dge$counts))
+d_pca <- as.data.frame(pca_genes$x) 
+
+# create PCA plot
+pca_plot <- ggplot(d_pca, aes(x = PC1,y = PC2, color = group)) +
+  labs(title = "Principle Component Analysis on ADvsCt RNA-seq Data") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  geom_point() +
+  scale_color_discrete(name = "Groups")
+  
+# show plot
+print(pca_plot)
+```
+
 ---
 
 # 4. Generalized Linear Model
@@ -243,7 +292,7 @@ dge_raw <- DGEList(counts=counts, group=group)
 dge_raw$genes <- annot[match(rownames(dge_raw), annot$GeneID), ]
 dge_raw <- dge_raw[keep, , keep.lib.sizes=FALSE]
 
-design <- model.matrix(~ group)
+design <- model.matrix(~ group) # specify the design model
 
 # Without normalization
 dge_raw <- estimateDisp(dge_raw, design)
