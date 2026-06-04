@@ -6,16 +6,16 @@ output: html_document
 
 # Workshop Overview
 
-This notebook accompanies **Day 3** of the McGill MiCM RNA-seq Workshop.  
+This notebook accompanies **Day 3** of the McGill MiCM RNA-seq Workshop.\
 We will cover:
 
-- Basic statistics review
-- Why linear regression fails for RNA-seq counts  
-- Poisson vs. Negative Binomial distributions  
-- edgeR workflow for RNA-seq DE: filtering, normalization, dispersion, GLM fitting  
-- Why normalization and dispersion matter (hands-on comparisons)  
+-   Basic statistics review
+-   Why linear regression fails for RNA-seq counts\
+-   Poisson vs. Negative Binomial distributions\
+-   edgeR workflow for RNA-seq DE: filtering, normalization, dispersion, GLM fitting\
+-   Why normalization and dispersion matter (hands-on comparisons)
 
----
+------------------------------------------------------------------------
 
 # 0. Load Required Libraries
 
@@ -26,7 +26,7 @@ library(dplyr)
 library(MASS)
 ```
 
----
+------------------------------------------------------------------------
 
 # 1. Statistics Review
 
@@ -70,7 +70,6 @@ plot(x, y, pch=16, main="Poisson GLM fit")
 lines(x, predict(glm_fit, type="response"), col="blue", lwd=2)
 ```
 
-
 Relevant distribution for count data: Poisson and negative binomial
 
 ```{r}
@@ -99,7 +98,7 @@ x <- 1:20
 # Generate overdispersed count data (mean increases exponentially with x)
 lambda <- exp(0.3 * x)
 # Add extra biological noise (overdispersion)
-y <- rnbinom(20, mu = lambda, size = 5)
+y <- rnbinom(20, mu = lambda, size = 100)
 y_log <- log(y+0.000001)
 
 # Fit three models
@@ -158,12 +157,11 @@ abline(h = 0, col = "grey")
 par(mfrow = c(1, 1))
 ```
 
----
+------------------------------------------------------------------------
 
 # 2. Create Count Matrix Object
 
-Here the two tsv files should be in the same directory as this .Rmd file.
-They can be downloaded from Github in the Exercises/Data folder.
+Here the two tsv files should be in the same directory as this .Rmd file. They can be downloaded from Github in the Exercises/Data folder.
 
 ```{r}
 # Load counts (first column = GeneID, first row = header)
@@ -214,11 +212,12 @@ dge$genes <- annot[match(rownames(dge), annot$GeneID), ]
 dge
 ```
 
----
+------------------------------------------------------------------------
 
 # 3. Filter and Normalization
 
 PCA before filter/normalization
+
 ```{r}
 # turn gene counts into dataframe
 pca_genes <- prcomp(t(dge$counts))
@@ -239,6 +238,7 @@ Filtering and normalization
 
 ```{r}
 before_n_genes <- nrow(dge)
+# optional: ribosomal RNA filter from geneID list
 # Minimum gene expression filter --> keep genes with at least 5 read/million in at least n samples
 data_cpm <- cpm(dge)               # calculate counts per million
 keep <- rowSums(data_cpm >= 1) >= 4      # creates boolean vector
@@ -267,6 +267,7 @@ barplot(dge$samples$norm.factors,
 ```
 
 PCA after filter/normalization
+
 ```{r}
 # turn gene counts into dataframe
 pca_genes <- prcomp(t(dge$counts))
@@ -283,7 +284,7 @@ pca_plot <- ggplot(d_pca, aes(x = PC1,y = PC2, color = group)) +
 print(pca_plot)
 ```
 
----
+------------------------------------------------------------------------
 
 # 4. Generalized Linear Model
 
@@ -309,7 +310,7 @@ head(topTags(lrt_raw))
 head(topTags(lrt_norm))
 ```
 
----
+------------------------------------------------------------------------
 
 # 5. Dispersion
 
@@ -334,15 +335,13 @@ head(topTags(lrt_pois))
 head(topTags(lrt_nb))
 ```
 
----
+------------------------------------------------------------------------
 
 # 6. Visualization
 
 MA Plot
 
 ```{r}
-plotMD(lrt_nb, status=decideTestsDGE(lrt_nb),
+plotMD(lrt_nb, status=decideTests(lrt_nb),
        main="MA Plot (LRT with Dispersion)", ylim=c(-20,20))
 ```
-
-

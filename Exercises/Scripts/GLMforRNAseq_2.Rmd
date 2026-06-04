@@ -379,7 +379,7 @@ ggplot(res, aes(x = logFC, y = -log10(FDR), color = significant)) +
 MA Plot
 
 ```{r}
-plotMD(lrt_nb, status=decideTestsDGE(lrt_nb),
+plotMD(lrt_nb, status=decideTests(lrt_nb),
        main="MA Plot (LRT with Dispersion)", ylim=c(-20,20))
 
 # Add labels manually
